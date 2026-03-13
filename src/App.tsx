@@ -30,6 +30,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import toast, { Toaster } from 'react-hot-toast';
 import { 
   Student, 
   Teacher, 
@@ -62,7 +63,7 @@ const StepNavigation = ({
     {step > 1 ? (
       <Button variant="secondary" onClick={() => onStepClick(step - 1)} icon={ArrowLeft} className="px-3 py-1.5 text-xs">上一步</Button>
     ) : <div />}
-    <div className="text-[10px] font-bold uppercase tracking-widest text-black/20">步骤 {step} / 6</div>
+    <div className="text-xs font-bold uppercase tracking-widest text-black/20">步骤 {step} / 6</div>
     {step < 6 ? (
       <Button disabled={nextDisabled} onClick={() => onStepClick(step + 1)} icon={ArrowRight} className="px-3 py-1.5 text-xs">下一步</Button>
     ) : <div />}
@@ -72,7 +73,7 @@ const StepNavigation = ({
 const Card = ({ children, className, onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) => (
   <div 
     onClick={onClick}
-    className={cn("bg-white rounded-[32px] border border-black/5 shadow-sm overflow-hidden", className)}
+    className={cn("bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all duration-300 overflow-hidden", className)}
   >
     {children}
   </div>
@@ -150,6 +151,8 @@ export default function App() {
   const [activeAssignIdx, setActiveAssignIdx] = useState(0);
   const [manualStudent, setManualStudent] = useState({ id: '', name: '', className: '' });
   const [showManualStudent, setShowManualStudent] = useState(false);
+  const [teacherInput, setTeacherInput] = useState('');
+  const [courseInput, setCourseInput] = useState('');
 
   const prevStudentsRef = React.useRef(students);
   useEffect(() => {
@@ -464,7 +467,7 @@ export default function App() {
   const proceedToStep5 = () => {
     const invalid = groups.some(g => (g.splitConfig.numLabs - 1) * g.splitConfig.baseCapacity >= g.totalStudents && g.splitConfig.numLabs > 1);
     if (invalid) {
-      alert('部分课程的拆分设置不合理（前置教室人数已超过总人数），请检查！');
+      toast.error('部分课程的拆分设置不合理（前置教室人数已超过总人数），请检查！');
       return;
     }
     if (studentConflicts.length > 0) {
@@ -714,20 +717,34 @@ export default function App() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card className="p-8">
-          <h3 className="text-xl font-medium mb-6 flex items-center gap-2"><UserPlus size={20} /> 批量添加</h3>
-          <textarea 
-            placeholder="每行输入一个教师姓名..."
-            className="w-full h-48 p-4 rounded-2xl border border-black/10 focus:outline-none focus:ring-2 focus:ring-black/5 mb-4 resize-none"
-            value={batchTeacherText}
-            onChange={(e) => setBatchTeacherText(e.target.value)}
-          />
-          <Button onClick={handleBatchTeacher} className="w-full">确认添加</Button>
-          <div className="mt-6 pt-6 border-t border-black/5">
-            <label className="flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-black/10 cursor-pointer hover:bg-black/5 transition-colors">
-              <Upload size={18} />
-              <span className="text-sm font-medium">从 Excel 导入教师</span>
-              <input type="file" className="hidden" accept=".xlsx,.xls" onChange={handleTeacherUpload} />
-            </label>
+          <h3 className="text-xl font-medium mb-6 flex items-center gap-2"><UserPlus size={20} /> 快速录入</h3>
+          <div className="space-y-4">
+            <div className="relative">
+              <input 
+                type="text"
+                placeholder="输入教师姓名并按回车..."
+                className="w-full px-4 py-3 rounded-xl border border-black/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                value={teacherInput}
+                onChange={(e) => setTeacherInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && teacherInput.trim()) {
+                    if (!teachers.some(t => t.name === teacherInput.trim())) {
+                      setTeachers([...teachers, { name: teacherInput.trim() }]);
+                    }
+                    setTeacherInput('');
+                  }
+                }}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-black/20 uppercase tracking-widest pointer-events-none">Enter</div>
+            </div>
+            
+            <div className="mt-6 pt-6 border-t border-black/5">
+              <label className="flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-black/10 cursor-pointer hover:bg-black/5 transition-colors">
+                <Upload size={18} />
+                <span className="text-sm font-medium">从 Excel 导入教师</span>
+                <input type="file" className="hidden" accept=".xlsx,.xls" onChange={handleTeacherUpload} />
+              </label>
+            </div>
           </div>
         </Card>
         
@@ -741,8 +758,14 @@ export default function App() {
               <p className="text-black/20 text-sm italic">暂无教师数据</p>
             ) : (
               teachers.map((t, i) => (
-                <span key={i} className="px-4 py-2 bg-white rounded-full text-sm font-medium border border-black/5 shadow-sm">
+                <span key={i} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full text-sm flex items-center gap-1 font-medium group transition-all hover:bg-emerald-100">
                   {t.name}
+                  <button 
+                    onClick={() => setTeachers(teachers.filter((_, idx) => idx !== i))}
+                    className="hover:text-red-500 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
                 </span>
               ))
             )}
@@ -772,46 +795,57 @@ export default function App() {
       <div className="grid grid-cols-1 gap-8">
         <Card className="p-8">
           <div className="flex gap-4 mb-8">
-            <textarea 
-              placeholder="输入课程名称，每行一个..."
-              className="flex-1 p-4 rounded-2xl border border-black/10 focus:outline-none focus:ring-2 focus:ring-black/5 min-h-[120px] resize-none"
-              value={batchGroupText}
-              onChange={(e) => setBatchGroupText(e.target.value)}
-            />
-            <Button onClick={handleBatchAddGroup} className="h-fit">批量添加</Button>
+            <div className="flex-1 relative">
+              <input 
+                type="text"
+                placeholder="输入课程名称并按回车..."
+                className="w-full px-4 py-3 rounded-xl border border-black/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                value={courseInput}
+                onChange={(e) => setCourseInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && courseInput.trim()) {
+                    const name = courseInput.trim();
+                    if (!groups.some(g => g.courseName === name)) {
+                      setGroups([...groups, {
+                        id: Math.random().toString(36).substr(2, 9),
+                        courseName: name,
+                        classNames: [],
+                        totalStudents: 0,
+                        students: [],
+                        invalidClasses: [],
+                        assignments: [],
+                        time: { startWeek: 1, endWeek: 16, weekday: 1, session: '上午', period: '1-4节' },
+                        splitConfig: { numLabs: 1, baseCapacity: 32, columns: 4, rows: 8 }
+                      }]);
+                    }
+                    setCourseInput('');
+                  }
+                }}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-black/20 uppercase tracking-widest pointer-events-none">Enter</div>
+            </div>
           </div>
           
           <div className="mb-6 flex items-center justify-between">
             <h3 className="text-xl font-medium">已创建课程 ({groups.length})</h3>
           </div>
 
-          <div className="space-y-3">
+          <div className="flex flex-wrap gap-3">
             {groups.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-black/10 rounded-3xl">
+              <div className="w-full text-center py-12 border border-dashed border-black/10 rounded-3xl">
                 <p className="text-black/20">暂无课程，请先添加</p>
               </div>
             ) : (
               groups.map(group => (
-                <div key={group.id} className="flex items-center justify-between p-4 rounded-2xl bg-[#F5F5F5] group">
-                  <div className="flex items-center gap-3">
-                    <BookOpen size={18} className="text-black/40" />
-                    <div>
-                      <span className="font-medium">{group.courseName || '未命名课程'}</span>
-                      {group.classNames.length > 0 && (
-                        <div className="text-xs text-black/40 mt-1">
-                          {group.classNames.join('、')} ({group.totalStudents}人)
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
+                <div key={group.id} className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-sm flex items-center gap-2 font-medium group transition-all hover:bg-emerald-100">
+                  <BookOpen size={16} />
+                  <span>{group.courseName || '未命名课程'}</span>
+                  <button 
                     onClick={() => removeGroup(group.id)}
-                    icon={Trash2}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500"
+                    className="hover:text-red-500 transition-colors"
                   >
-                    删除
-                  </Button>
+                    <X size={14} />
+                  </button>
                 </div>
               ))
             )}
@@ -1021,10 +1055,10 @@ export default function App() {
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
                     <tr className="bg-[#F5F5F5] border-b border-black/5">
-                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-[10px]">时间</th>
-                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-[10px]">课程名称</th>
-                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-[10px]">班级</th>
-                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-[10px]">实验室和教师分配</th>
+                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-xs">时间</th>
+                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-xs">课程名称</th>
+                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-xs">班级</th>
+                      <th className="p-4 font-bold text-black/40 uppercase tracking-widest text-xs">实验室和教师分配</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
@@ -1096,38 +1130,40 @@ export default function App() {
                         <span>学生人数: <span className="text-black font-medium">{activeAssign.studentRange.count} 人</span></span>
                       </div>
                     </div>
-                    <table className="w-full text-[11px] border-collapse border border-black/10">
-                      <thead>
-                        <tr className="bg-[#F5F5F5]">
-                          <th rowSpan={2} className="p-2 border border-black/10 text-center w-10">序号</th>
-                          <th rowSpan={2} className="p-2 border border-black/10 text-center w-32">学号</th>
-                          <th rowSpan={2} className="p-2 border border-black/10 text-center w-24">姓名</th>
-                          <th colSpan={9} className="p-1 border border-black/10 text-center">成绩</th>
-                          <th rowSpan={2} className="p-2 border border-black/10 text-center w-32">班级</th>
-                          <th rowSpan={2} className="p-2 border border-black/10 text-center w-24">备注</th>
-                        </tr>
-                        <tr className="bg-[#F5F5F5]">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                            <th key={n} className="p-1 border border-black/10 text-center w-8">{n}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeAssign.studentRange.studentList.map((s, i) => (
-                          <tr key={s.id} className="hover:bg-black/[0.01]">
-                            <td className="p-2 border border-black/10 text-center">{i + 1}</td>
-                            <td className="p-2 border border-black/10 font-mono text-center">{s.id}</td>
-                            <td className="p-2 border border-black/10 font-medium text-center">{s.name}</td>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                              <td key={n} className="p-2 border border-black/10"></td>
-                            ))}
-                            <td className="p-2 border border-black/10 text-center text-[10px] text-black/40">{s.className}</td>
-                            <td className="p-2 border border-black/10"></td>
+                    <div className="overflow-auto max-h-[600px] border border-black/5 rounded-xl">
+                      <table className="w-full text-[11px] border-collapse">
+                        <thead className="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                          <tr className="bg-[#F5F5F5]">
+                            <th rowSpan={2} className="p-2 border border-black/10 text-center w-10 font-bold text-black/40 uppercase tracking-wider">序号</th>
+                            <th rowSpan={2} className="p-2 border border-black/10 text-center w-32 font-bold text-black/40 uppercase tracking-wider">学号</th>
+                            <th rowSpan={2} className="p-2 border border-black/10 text-center w-24 font-bold text-black/40 uppercase tracking-wider">姓名</th>
+                            <th colSpan={9} className="p-1 border border-black/10 text-center font-bold text-black/40 uppercase tracking-wider">成绩</th>
+                            <th rowSpan={2} className="p-2 border border-black/10 text-center w-32 font-bold text-black/40 uppercase tracking-wider">班级</th>
+                            <th rowSpan={2} className="p-2 border border-black/10 text-center w-24 font-bold text-black/40 uppercase tracking-wider">备注</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="mt-4 text-[10px] text-black/30 italic">
+                          <tr className="bg-[#F5F5F5]">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                              <th key={n} className="p-1 border border-black/10 text-center w-8 font-bold text-black/40">{n}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeAssign.studentRange.studentList.map((s, i) => (
+                            <tr key={s.id} className="hover:bg-emerald-50/50 even:bg-black/[0.02] transition-colors">
+                              <td className="p-2 border border-black/10 text-center">{i + 1}</td>
+                              <td className="p-2 border border-black/10 font-mono text-center">{s.id}</td>
+                              <td className="p-2 border border-black/10 font-medium text-center">{s.name}</td>
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                                <td key={n} className="p-2 border border-black/10"></td>
+                              ))}
+                              <td className="p-2 border border-black/10 text-center text-[10px] text-black/40">{s.className}</td>
+                              <td className="p-2 border border-black/10"></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 text-xs text-black/30 italic">
                       * 预览格式已同步教务标准成绩表样式
                     </div>
                   </Card>
@@ -1141,7 +1177,7 @@ export default function App() {
                         <div className="w-full py-4 bg-black/5 rounded-2xl border border-black/10 font-bold text-xl tracking-[1em] mb-8">讲台</div>
                       </div>
                       
-                      <div className="grid grid-cols-[1fr_20px_1fr_20px_1fr_20px_1fr] gap-0 border border-black/10">
+                      <div className="grid grid-cols-[1fr_20px_1fr_20px_1fr_20px_1fr] gap-0 border border-black/10 max-h-[600px] overflow-y-auto">
                         {/* 4 Columns Seating Preview with Aisles */}
                         {[0, 1, 2, 3].map(colIdx => {
                           const rows = Math.ceil(activeAssign.studentRange.studentList.length / 4);
@@ -1151,18 +1187,18 @@ export default function App() {
                           return (
                             <React.Fragment key={colIdx}>
                               <div className="flex flex-col">
-                                <div className="grid grid-cols-2 bg-[#F5F5F5] border-b border-black/10">
-                                  <div className="p-1 border-r border-black/10 text-[9px] font-bold text-center">学号</div>
-                                  <div className="p-1 text-[9px] font-bold text-center">姓名</div>
+                                <div className="grid grid-cols-2 bg-gray-50 border-b border-black/10 sticky top-0 z-10 shadow-sm">
+                                  <div className="p-1 border-r border-black/10 text-xs font-bold text-center">学号</div>
+                                  <div className="p-1 text-xs font-bold text-center">姓名</div>
                                 </div>
                                 {Array.from({ length: displayRows }).map((_, rowIdx) => {
                                   const student = colStudents[rowIdx];
                                   return (
-                                    <div key={rowIdx} className="grid grid-cols-2 border-b border-black/10 min-h-[32px]">
-                                      <div className="p-1 border-r border-black/10 text-[9px] font-mono flex items-center justify-center bg-white">
+                                    <div key={rowIdx} className="grid grid-cols-2 border-b border-black/10 min-h-[32px] hover:bg-emerald-50/50 even:bg-black/[0.01] transition-colors">
+                                      <div className="p-1 border-r border-black/10 text-xs font-mono flex items-center justify-center bg-white/50">
                                         {student?.id || ''}
                                       </div>
-                                      <div className="p-1 text-[10px] font-medium flex items-center justify-center bg-white">
+                                      <div className="p-1 text-xs font-medium flex items-center justify-center bg-white/50">
                                         {student?.name || ''}
                                       </div>
                                     </div>
@@ -1177,15 +1213,15 @@ export default function App() {
                       
                       <div className="mt-12 pt-8 border-t border-black/5 flex justify-between items-center text-black/40">
                         <div className="text-left">
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1">课程信息</p>
+                          <p className="text-xs font-bold uppercase tracking-widest mb-1">课程信息</p>
                           <p className="text-sm font-medium text-black">{activeGroup.courseName}</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1">实验室</p>
+                          <p className="text-xs font-bold uppercase tracking-widest mb-1">实验室</p>
                           <p className="text-sm font-medium text-black">{activeAssign.labName}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1">带教教师</p>
+                          <p className="text-xs font-bold uppercase tracking-widest mb-1">带教教师</p>
                           <p className="text-sm font-medium text-black">{activeAssign.teacherName}</p>
                         </div>
                       </div>
@@ -1288,14 +1324,40 @@ export default function App() {
           </button>
         </div>
 
-        <div className="mt-4 text-[8px] text-black/10 font-bold uppercase tracking-tighter vertical-text select-none">
+        <div className="mt-4 text-xs text-black/10 font-bold uppercase tracking-tighter vertical-text select-none">
           © 2026 Lab Scheduler
         </div>
       </div>
 
 
       {/* Main Content */}
-      <div className="flex-1 bg-[#FAFAFA]">
+      <div className="flex-1 bg-[#FAFAFA] flex flex-col">
+        <Toaster position="top-center" />
+        
+        {/* Resource Dashboard */}
+        <div className="bg-white/80 backdrop-blur-md border-b border-black/5 px-8 py-3 flex items-center justify-between z-40">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-black/20 uppercase tracking-widest">待排课组数</span>
+              <span className={cn(
+                "text-sm font-bold",
+                groups.filter(g => g.classNames.length === 0).length > 0 ? "text-red-500" : "text-emerald-500"
+              )}>
+                {groups.filter(g => g.classNames.length === 0).length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-black/20 uppercase tracking-widest">实验室利用率</span>
+              <span className="text-sm font-bold text-black">
+                {groups.reduce((acc, g) => acc + (g.assignments?.length || 0), 0)} / {totalLabs}
+              </span>
+            </div>
+          </div>
+          <div className="text-xs font-medium text-black/40">
+            {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+          </div>
+        </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
@@ -1533,29 +1595,29 @@ const TeachingGroupCard = ({ group, allClassNames, studentsPool, coursePool, onU
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-3 border-t border-black/5">
-            <div className="space-y-0.5">
-              <label className="text-[8px] font-bold uppercase tracking-wider text-black/30">周次范围</label>
-              <div className="flex items-center gap-1">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-black/30">周次范围</label>
+              <div className="flex items-center gap-2">
                 <input 
                   type="number" 
-                  className="w-full p-1 bg-[#F5F5F5] rounded-lg text-[10px] font-medium focus:outline-none"
+                  className="w-full p-2 bg-[#F5F5F5] rounded-lg text-xs font-medium focus:outline-none"
                   value={group.time.startWeek}
                   onChange={(e) => onUpdate({ time: { ...group.time, startWeek: Number(e.target.value) } })}
                 />
-                <span className="text-black/10">-</span>
+                <span className="text-black/20">-</span>
                 <input 
                   type="number" 
-                  className="w-full p-1 bg-[#F5F5F5] rounded-lg text-[10px] font-medium focus:outline-none"
+                  className="w-full p-2 bg-[#F5F5F5] rounded-lg text-xs font-medium focus:outline-none"
                   value={group.time.endWeek}
                   onChange={(e) => onUpdate({ time: { ...group.time, endWeek: Number(e.target.value) } })}
                 />
               </div>
             </div>
 
-            <div className="space-y-0.5">
-              <label className="text-[8px] font-bold uppercase tracking-wider text-black/30">星期</label>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-black/30">星期</label>
               <select 
-                className="w-full p-1 bg-[#F5F5F5] rounded-lg text-[10px] font-medium focus:outline-none"
+                className="w-full p-2 bg-[#F5F5F5] rounded-lg text-xs font-medium focus:outline-none"
                 value={group.time.weekday}
                 onChange={(e) => onUpdate({ time: { ...group.time, weekday: Number(e.target.value) } })}
               >
@@ -1563,10 +1625,10 @@ const TeachingGroupCard = ({ group, allClassNames, studentsPool, coursePool, onU
               </select>
             </div>
 
-            <div className="space-y-0.5">
-              <label className="text-[8px] font-bold uppercase tracking-wider text-black/30">时段</label>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-black/30">时段</label>
               <select 
-                className="w-full p-1 bg-[#F5F5F5] rounded-lg text-[10px] font-medium focus:outline-none"
+                className="w-full p-2 bg-[#F5F5F5] rounded-lg text-xs font-medium focus:outline-none"
                 value={group.time.session}
                 onChange={(e) => onUpdate({ time: { ...group.time, session: e.target.value as SessionType, period: e.target.value === '上午' ? '1-4节' : '6-9节' } })}
               >
@@ -1574,19 +1636,19 @@ const TeachingGroupCard = ({ group, allClassNames, studentsPool, coursePool, onU
               </select>
             </div>
 
-            <div className="space-y-0.5">
-              <label className="text-[8px] font-bold uppercase tracking-wider text-black/30">节次</label>
-              <div className="flex items-center gap-1">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-black/30">节次</label>
+              <div className="flex items-center gap-2">
                 <select 
-                  className="w-full p-1 bg-[#F5F5F5] rounded-lg text-[10px] font-medium focus:outline-none"
+                  className="w-full p-2 bg-[#F5F5F5] rounded-lg text-xs font-medium focus:outline-none"
                   value={startP}
                   onChange={(e) => onUpdate({ time: { ...group.time, period: `${e.target.value}-${endP}节` } })}
                 >
                   {getPeriodOptions().map(p => <option key={p} value={p}>{p}节</option>)}
                 </select>
-                <span className="text-black/10">-</span>
+                <span className="text-black/20">-</span>
                 <select 
-                  className="w-full p-1 bg-[#F5F5F5] rounded-lg text-[10px] font-medium focus:outline-none"
+                  className="w-full p-2 bg-[#F5F5F5] rounded-lg text-xs font-medium focus:outline-none"
                   value={endP}
                   onChange={(e) => onUpdate({ time: { ...group.time, period: `${startP}-${e.target.value}节` } })}
                 >
@@ -1601,71 +1663,63 @@ const TeachingGroupCard = ({ group, allClassNames, studentsPool, coursePool, onU
         <div className="w-full lg:w-72 bg-[#F5F5F5] rounded-[24px] p-5 space-y-3">
           <h4 className="text-sm font-bold flex items-center gap-2 text-black/60"><Split size={16} /> 拆分设置</h4>
           
-          <div className="space-y-2">
-            <div className="space-y-0.5">
-              <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-black/30">
-                <span>实验室数量</span>
-                <span className="text-black">{group.splitConfig.numLabs} 间</span>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-black/30">实验室数量</label>
               <input 
-                type="range" min="1" max="10" 
-                className="w-full h-1 bg-black/10 rounded-lg appearance-none cursor-pointer accent-black"
+                type="number" min="1" max="10" 
+                className="w-full p-2 bg-white rounded-lg text-xs font-medium focus:outline-none"
                 value={group.splitConfig.numLabs}
                 onChange={(e) => onUpdate({ splitConfig: { ...group.splitConfig, numLabs: Number(e.target.value) } })}
               />
             </div>
 
-            <div className="space-y-0.5">
-              <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-black/30">
-                <span>基准人数</span>
-                <span className="text-black">{group.splitConfig.baseCapacity} 人</span>
-              </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-black/30">基准人数</label>
               <input 
-                type="range" min="10" max="60" 
-                className="w-full h-1 bg-black/10 rounded-lg appearance-none cursor-pointer accent-black"
+                type="number" min="10" max="60" 
+                className="w-full p-2 bg-white rounded-lg text-xs font-medium focus:outline-none"
                 value={group.splitConfig.baseCapacity}
                 onChange={(e) => onUpdate({ splitConfig: { ...group.splitConfig, baseCapacity: Number(e.target.value) } })}
               />
             </div>
+          </div>
 
-            <div className="pt-2 border-t border-black/5 space-y-2">
-              <h5 className="text-[9px] font-bold uppercase tracking-widest text-black/20">座位设置</h5>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex justify-between text-[9px] font-medium text-black/40">
-                    <span>列数 (默认4)</span>
-                    <span className="text-black">{group.splitConfig.columns || 4}</span>
-                  </div>
+          <details className="group">
+            <summary className="text-xs font-bold uppercase tracking-widest text-black/40 cursor-pointer hover:text-black transition-colors flex items-center gap-2 list-none">
+              <Settings size={12} className="group-open:rotate-90 transition-transform" />
+              高级设置 (座位排版)
+            </summary>
+            <div className="pt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-black/40">列数 (默认4)</label>
                   <input 
-                    type="range" min="1" max="10" 
-                    className="w-full h-1 bg-black/10 rounded-lg appearance-none cursor-pointer accent-black"
+                    type="number" min="1" max="10" 
+                    className="w-full p-2 bg-white rounded-lg text-xs font-medium focus:outline-none"
                     value={group.splitConfig.columns || 4}
                     onChange={(e) => onUpdate({ splitConfig: { ...group.splitConfig, columns: Number(e.target.value) } })}
                   />
                 </div>
 
-                <div className="space-y-0.5">
-                  <div className="flex justify-between text-[9px] font-medium text-black/40">
-                    <span>每列 (默认8)</span>
-                    <span className="text-black">{group.splitConfig.rows || 8}</span>
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-black/40">每列 (默认8)</label>
                   <input 
-                    type="range" min="1" max="20" 
-                    className="w-full h-1 bg-black/10 rounded-lg appearance-none cursor-pointer accent-black"
+                    type="number" min="1" max="20" 
+                    className="w-full p-2 bg-white rounded-lg text-xs font-medium focus:outline-none"
                     value={group.splitConfig.rows || 8}
                     onChange={(e) => onUpdate({ splitConfig: { ...group.splitConfig, rows: Number(e.target.value) } })}
                   />
                 </div>
               </div>
               
-              <div className="text-[8px] text-black/20 text-center font-bold">
+              <div className="text-xs text-black/20 text-center font-bold bg-black/5 py-2 rounded-lg">
                 单间总容量: {(group.splitConfig.columns || 4) * (group.splitConfig.rows || 8)} 人
               </div>
             </div>
-          </div>
+          </details>
 
-          <div className="pt-3 border-t border-black/5 flex justify-between text-[10px]">
+          <div className="pt-3 border-t border-black/5 flex justify-between text-xs">
             <div className="flex flex-col">
               <span className="text-black/30 uppercase font-bold">前置</span>
               <span className="font-medium">{group.splitConfig.numLabs - 1} × {group.splitConfig.baseCapacity}</span>
