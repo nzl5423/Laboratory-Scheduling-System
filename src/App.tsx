@@ -138,8 +138,6 @@ export default function App() {
   const [showInfo, setShowInfo] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const [batchGroupText, setBatchGroupText] = useState('');
-  const [batchTeacherText, setBatchTeacherText] = useState('');
   const [studentSummary, setStudentSummary] = useState<string | null>(null);
   const [teacherSummary, setTeacherSummary] = useState<string | null>(null);
   const [groupSummary, setGroupSummary] = useState<string | null>(null);
@@ -394,24 +392,6 @@ export default function App() {
       time: { startWeek: 1, endWeek: 16, weekday: 1, session: '上午', period: '1-4节' },
       assignments: []
     };
-  };
-
-  const handleBatchAddGroup = () => {
-    const names = batchGroupText.split('\n').map(n => n.trim()).filter(Boolean);
-    const newGroups = names.map(name => createGroupObject(name, []));
-    batchAddGroups(newGroups);
-    setBatchGroupText('');
-  };
-
-  const handleManualAddGroup = () => {
-    const newGroup = createGroupObject('', []);
-    addGroup(newGroup);
-  };
-
-  const handleBatchTeacher = () => {
-    const names = batchTeacherText.split('\n').map(n => n.trim()).filter(Boolean);
-    setTeachers([...teachers, ...names.map(name => ({ name }))]);
-    setBatchTeacherText('');
   };
 
   // --- Step 5: Split Logic ---
@@ -758,7 +738,7 @@ export default function App() {
               <p className="text-black/20 text-sm italic">暂无教师数据</p>
             ) : (
               teachers.map((t, i) => (
-                <span key={i} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full text-sm flex items-center gap-1 font-medium group transition-all hover:bg-emerald-100">
+                <span key={i} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full text-sm flex items-center gap-1.5 font-medium group transition-all hover:bg-emerald-100 shadow-sm">
                   {t.name}
                   <button 
                     onClick={() => setTeachers(teachers.filter((_, idx) => idx !== i))}
@@ -806,17 +786,7 @@ export default function App() {
                   if (e.key === 'Enter' && courseInput.trim()) {
                     const name = courseInput.trim();
                     if (!groups.some(g => g.courseName === name)) {
-                      setGroups([...groups, {
-                        id: Math.random().toString(36).substr(2, 9),
-                        courseName: name,
-                        classNames: [],
-                        totalStudents: 0,
-                        students: [],
-                        invalidClasses: [],
-                        assignments: [],
-                        time: { startWeek: 1, endWeek: 16, weekday: 1, session: '上午', period: '1-4节' },
-                        splitConfig: { numLabs: 1, baseCapacity: 32, columns: 4, rows: 8 }
-                      }]);
+                      addGroup(createGroupObject(name, []));
                     }
                     setCourseInput('');
                   }
