@@ -1100,10 +1100,10 @@ export default function App() {
                         <span>学生人数: <span className="text-black font-medium">{activeAssign.studentRange.count} 人</span></span>
                       </div>
                     </div>
-                    <div className="overflow-auto max-h-[600px] border border-black/5 rounded-xl">
+                    <div className="overflow-auto max-h-[600px] border border-black/5 rounded-xl shadow-inner bg-white">
                       <table className="w-full text-[11px] border-collapse">
                         <thead className="sticky top-0 bg-gray-50 z-10 shadow-sm">
-                          <tr className="bg-[#F5F5F5]">
+                          <tr className="bg-gray-50">
                             <th rowSpan={2} className="p-2 border border-black/10 text-center w-10 font-bold text-black/40 uppercase tracking-wider">序号</th>
                             <th rowSpan={2} className="p-2 border border-black/10 text-center w-32 font-bold text-black/40 uppercase tracking-wider">学号</th>
                             <th rowSpan={2} className="p-2 border border-black/10 text-center w-24 font-bold text-black/40 uppercase tracking-wider">姓名</th>
@@ -1111,7 +1111,7 @@ export default function App() {
                             <th rowSpan={2} className="p-2 border border-black/10 text-center w-32 font-bold text-black/40 uppercase tracking-wider">班级</th>
                             <th rowSpan={2} className="p-2 border border-black/10 text-center w-24 font-bold text-black/40 uppercase tracking-wider">备注</th>
                           </tr>
-                          <tr className="bg-[#F5F5F5]">
+                          <tr className="bg-gray-50">
                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
                               <th key={n} className="p-1 border border-black/10 text-center w-8 font-bold text-black/40">{n}</th>
                             ))}
@@ -1307,24 +1307,27 @@ export default function App() {
         
         {/* Resource Dashboard */}
         <div className="bg-white/80 backdrop-blur-md border-b border-black/5 px-8 py-3 flex items-center justify-between z-40">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-black/20 uppercase tracking-widest">待排课组数</span>
-              <span className={cn(
-                "text-sm font-bold",
-                groups.filter(g => g.classNames.length === 0).length > 0 ? "text-red-500" : "text-emerald-500"
-              )}>
-                {groups.filter(g => g.classNames.length === 0).length}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-black/20 uppercase tracking-widest">实验室利用率</span>
-              <span className="text-sm font-bold text-black">
-                {groups.reduce((acc, g) => acc + (g.assignments?.length || 0), 0)} / {totalLabs}
-              </span>
+          <div className="flex items-center gap-4">
+            {(() => {
+              const pendingCount = groups.filter(g => g.classNames.length === 0).length;
+              return (
+                <div className={cn(
+                  "px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2",
+                  pendingCount > 0 ? "bg-orange-50 text-orange-600" : "bg-emerald-50 text-emerald-600"
+                )}>
+                  <div className={cn("w-1.5 h-1.5 rounded-full", pendingCount > 0 ? "bg-orange-600 animate-pulse" : "bg-emerald-600")} />
+                  {pendingCount > 0 ? `待排课课程: ${pendingCount}` : "全部课程已就绪"}
+                </div>
+              );
+            })()}
+            
+            <div className="px-3 py-1 bg-black/[0.03] text-black/60 rounded-full text-xs font-medium flex items-center gap-2">
+              <LayoutGrid size={12} />
+              可用实验室: {totalLabs} 间
             </div>
           </div>
-          <div className="text-xs font-medium text-black/40">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-black/20 flex items-center gap-2">
+            <Calendar size={12} />
             {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </div>
         </div>
