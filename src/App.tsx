@@ -190,7 +190,7 @@ export default function App() {
       return;
     }
     if (students.length === 0) {
-      alert('请先上传学生名单！');
+      toast.error('请先上传学生名单！');
       return;
     }
     if (targetStep === 3 || targetStep === 4) {
@@ -198,7 +198,7 @@ export default function App() {
       return;
     }
     if (groups.length === 0) {
-      alert('请先完成合班分组设置！');
+      toast.error('请先完成合班分组设置！');
       return;
     }
     if (targetStep === 5) {
@@ -214,7 +214,7 @@ export default function App() {
     }
     if (targetStep === 6) {
       if (!isAllTeachersAssigned) {
-        alert('请先为所有实验室分配教师！');
+        toast.error('请先为所有实验室分配教师！');
         return;
       }
       setStep(6);
@@ -570,12 +570,12 @@ export default function App() {
         const data = JSON.parse(event.target?.result as string);
         if (data.students && data.groups) {
           loadState(data);
-          alert('进度加载成功！');
+          toast.success('进度加载成功！');
         } else {
-          alert('无效的进度文件格式。');
+          toast.error('无效的进度文件格式。');
         }
       } catch (err) {
-        alert('解析文件失败。');
+        toast.error('解析文件失败。');
       }
     };
     reader.readAsText(file);
@@ -583,7 +583,7 @@ export default function App() {
 
   const handleManualAddStudent = () => {
     if (!manualStudent.id || !manualStudent.name || !manualStudent.className) {
-      alert('请填写完整信息！');
+      toast.error('请填写完整信息！');
       return;
     }
     setStudents([...students, { ...manualStudent, gender: '', major: '' }]);
@@ -1241,6 +1241,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-white">
+      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '12px' } }} />
       {/* Navigation Rail */}
       <div className="w-16 md:w-20 border-r border-black/5 flex flex-col items-center py-6 gap-6 sticky top-0 h-screen bg-white z-50 shrink-0">
         <div className="flex flex-col gap-4 flex-1">
