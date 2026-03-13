@@ -112,11 +112,9 @@ export const useStore = create<AppState>()(
       clearAiMessages: () => set({ aiMessages: [] }),
 
       resetSystem: () => {
-        // Clear all storage and reset state
+        // Clear only our app's storage and reset state
         try {
           localStorage.removeItem('lab-schedule-storage');
-          localStorage.clear();
-          sessionStorage.clear();
         } catch (e) {
           console.error(e);
         }
@@ -128,6 +126,7 @@ export const useStore = create<AppState>()(
           groups: [],
           courses: [],
           totalLabs: 10,
+          aiMessages: [],
         });
         
         // Hard reload to ensure all local state is wiped
@@ -138,7 +137,7 @@ export const useStore = create<AppState>()(
       name: 'lab-schedule-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => {
-        const { aiApiKey, aiBaseUrl, aiModel, aiMessages, ...rest } = state;
+        const { aiMessages, ...rest } = state;
         return rest;
       },
     }

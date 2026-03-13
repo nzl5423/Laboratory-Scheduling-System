@@ -86,13 +86,13 @@ export const exportFullWorkbook = async (groups: CombinedClassGroup[], totalLabs
     // Vertical merge for Weekday
     if (index > 0 && currentWeekday !== lastWeekday) {
       if (mergeStartRow < row.number - 1) {
-        sheet1.mergeCells(`A${mergeStartRow}:A${row.number - 1}`);
+        sheet1.mergeCells(mergeStartRow, 1, row.number - 1, 1);
       }
       mergeStartRow = row.number;
     }
     if (index === groups.length - 1) {
       if (mergeStartRow < row.number) {
-        sheet1.mergeCells(`A${mergeStartRow}:A${row.number}`);
+        sheet1.mergeCells(mergeStartRow, 1, row.number, 1);
       }
     }
     lastWeekday = currentWeekday;
@@ -311,20 +311,19 @@ export const exportFullWorkbook = async (groups: CombinedClassGroup[], totalLabs
 
         // Seating Algorithm
         const students = sortStudents(assign.studentRange.studentList);
-        const col1 = students.slice(0, 8);
-        const col2 = students.slice(8, 16);
-        const col3 = students.slice(16, 24);
-        const col4 = students.slice(24);
+        const rows = Math.ceil(students.length / 4);
+        const col1 = students.slice(0, rows);
+        const col2 = students.slice(rows, rows * 2);
+        const col3 = students.slice(rows * 2, rows * 3);
+        const col4 = students.slice(rows * 3);
 
-        const maxRows = Math.max(8, col4.length);
+        const maxRows = Math.max(8, rows);
 
         for (let r = 0; r < maxRows; r++) {
           const rowData = new Array(11).fill('');
-          if (r < 8) {
-            if (col1[r]) { rowData[0] = col1[r].id; rowData[1] = col1[r].name; }
-            if (col2[r]) { rowData[3] = col2[r].id; rowData[4] = col2[r].name; }
-            if (col3[r]) { rowData[6] = col3[r].id; rowData[7] = col3[r].name; }
-          }
+          if (col1[r]) { rowData[0] = col1[r].id; rowData[1] = col1[r].name; }
+          if (col2[r]) { rowData[3] = col2[r].id; rowData[4] = col2[r].name; }
+          if (col3[r]) { rowData[6] = col3[r].id; rowData[7] = col3[r].name; }
           if (col4[r]) { rowData[9] = col4[r].id; rowData[10] = col4[r].name; }
           
           const row = seatSheet.addRow(rowData);

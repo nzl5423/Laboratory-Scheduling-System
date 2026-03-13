@@ -201,12 +201,10 @@ export default function App() {
     if (targetStep === 5) {
       const conflicts = checkStudentConflicts();
       if (conflicts.length > 0) {
-        alert(`发现学生上课时间冲突，请先调整：\n${conflicts[0]}`);
-        return;
+        if (!window.confirm(`发现学生上课时间冲突，是否忽略并强制继续？\n${conflicts[0]}`)) return;
       }
       if (labConflicts.length > 0) {
-        alert(`发现实验室资源冲突，请先调整：\n${labConflicts[0]}`);
-        return;
+        if (!window.confirm(`发现实验室资源冲突，是否忽略并强制继续？\n${labConflicts[0]}`)) return;
       }
       proceedToStep5();
       return;
@@ -470,8 +468,7 @@ export default function App() {
       return;
     }
     if (studentConflicts.length > 0) {
-      alert(`发现学生上课时间冲突，请先调整：\n${studentConflicts[0]}`);
-      return;
+      if (!window.confirm(`发现学生上课时间冲突，是否忽略并强制继续？\n${studentConflicts[0]}`)) return;
     }
     
     setGroups(groups.map(g => {
@@ -496,6 +493,11 @@ export default function App() {
   const checkTeacherConflict = (teacherName: string, currentGroupId: string, currentAssignIdx: number) => {
     if (!teacherName) return null;
     
+    // Validation: Check if teacher exists in library
+    if (!teachers.some(t => t.name === teacherName)) {
+      return { courseName: '教师不存在', labName: '请先在步骤2添加', time: '' };
+    }
+
     const currentGroup = groups.find(g => g.id === currentGroupId);
     if (!currentGroup) return null;
 
@@ -1142,13 +1144,9 @@ export default function App() {
                       <div className="grid grid-cols-[1fr_20px_1fr_20px_1fr_20px_1fr] gap-0 border border-black/10">
                         {/* 4 Columns Seating Preview with Aisles */}
                         {[0, 1, 2, 3].map(colIdx => {
-                          const colStudents = colIdx === 0 ? activeAssign.studentRange.studentList.slice(0, 8) :
-                                             colIdx === 1 ? activeAssign.studentRange.studentList.slice(8, 16) :
-                                             colIdx === 2 ? activeAssign.studentRange.studentList.slice(16, 24) :
-                                             activeAssign.studentRange.studentList.slice(24);
-                          
-                          const maxRows = Math.max(8, activeAssign.studentRange.studentList.length > 24 ? activeAssign.studentRange.studentList.length - 24 : 0);
-                          const displayRows = colIdx === 3 ? maxRows : 8;
+                          const rows = Math.ceil(activeAssign.studentRange.studentList.length / 4);
+                          const colStudents = activeAssign.studentRange.studentList.slice(colIdx * rows, (colIdx + 1) * rows);
+                          const displayRows = Math.max(8, rows);
 
                           return (
                             <React.Fragment key={colIdx}>
@@ -1171,7 +1169,7 @@ export default function App() {
                                   );
                                 })}
                               </div>
-                              {colIdx < 3 && <div className="bg-black/[0.02] border-x border-black/10" />}
+                              {colIdx < 3 && <div className="bg-black/[0.03] border-r border-black/10" />}
                             </React.Fragment>
                           );
                         })}
@@ -1692,7 +1690,7 @@ const TeachingGroupCard = ({ group, allClassNames, studentsPool, coursePool, onU
             if (classCmp !== 0) return classCmp;
             return a.id.localeCompare(b.id);
           });
-          const newNumLabs = Math.max(1, Math.ceil(groupStudents.length / 32));
+          const newNumLabs = Math.max(1, Math.ceil(groupStudents.length / (group.splitConfig.baseCapacity || 32)));
           onUpdate({ 
             classNames: selected, 
             totalStudents: groupStudents.length, 

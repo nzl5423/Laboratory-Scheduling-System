@@ -63,6 +63,10 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
       workbook.SheetNames.forEach(name => {
         content += `Sheet: ${name}\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}\n\n`;
       });
+      // Truncate large content to prevent token explosion
+      if (content.length > 3000) {
+        content = content.slice(0, 3000) + '\n...[内容已截断]';
+      }
       return { file, type: 'excel', content };
     }
 
@@ -74,6 +78,10 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         content += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+        if (content.length > 3000) break;
+      }
+      if (content.length > 3000) {
+        content = content.slice(0, 3000) + '\n...[内容已截断]';
       }
       return { file, type: 'pdf', content };
     }
@@ -81,7 +89,11 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
     if (['doc', 'docx'].includes(extension || '')) {
       const data = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer: data });
-      return { file, type: 'word', content: result.value };
+      let content = result.value;
+      if (content.length > 3000) {
+        content = content.slice(0, 3000) + '\n...[内容已截断]';
+      }
+      return { file, type: 'word', content };
     }
 
     return { file, type: 'other' };
@@ -142,6 +154,7 @@ ${groups.map(g => `  * 课程: ${g.courseName}, 班级: ${g.classNames.join('+')
 
 请根据用户的自然语言指令和上传的文件内容，决定是否需要执行操作。
 注意：你可以一次性返回多个 JSON 块来执行多个操作。
+**重要：请务必将所有 JSON 动作放在 \`\`\`json 和 \`\`\` 代码块中。**
 如果你修改了数据，请在回复中明确告知用户你做了哪些改动。`;
 
       const messages = [
@@ -171,66 +184,87 @@ ${groups.map(g => `  * 课程: ${g.courseName}, 班级: ${g.classNames.join('+')
       const assistantMessage = data.choices[0].message.content;
       
       // Process potential JSON actions in the response
+      // Priority: Extract from ```json ... ``` blocks
+      const codeBlockMatch = assistantMessage.match(/```json\s*([\s\S]*?)\s*```/g);
       const jsonMatch = assistantMessage.match(/\{[\s\S]*?\}/g);
       let executedActions = false;
 
-      if (jsonMatch) {
-        for (const jsonStr of jsonMatch) {
-          try {
-            const action = JSON.parse(jsonStr);
-            if (action.action === 'update_teacher') {
-              const newGroups = groups.map(g => {
-                if (g.courseName === action.courseName) {
-                  const newAssignments = g.assignments.map(a => {
-                    if (a.labName === action.labName) return { ...a, teacherName: action.teacherName };
-                    return a;
-                  });
-                  return { ...g, assignments: newAssignments };
-                }
-                return g;
-              });
-              setGroups(newGroups);
-              executedActions = true;
-            } else if (action.action === 'set_course_teachers') {
-              const newGroups = groups.map(g => {
-                if (g.courseName === action.courseName) {
-                  const newAssignments = g.assignments.map(a => ({ ...a, teacherName: action.teacherName }));
-                  return { ...g, assignments: newAssignments };
-                }
-                return g;
-              });
-              setGroups(newGroups);
-              executedActions = true;
-            } else if (action.action === 'update_split') {
-              const newGroups = groups.map(g => {
-                if (g.courseName === action.courseName) {
-                  return {
-                    ...g,
-                    splitConfig: {
-                      ...g.splitConfig,
-                      ...(action.numLabs !== undefined && { numLabs: action.numLabs }),
-                      ...(action.baseCapacity !== undefined && { baseCapacity: action.baseCapacity }),
-                    }
-                  };
-                }
-                return g;
-              });
-              setGroups(newGroups);
-              executedActions = true;
-            } else if (action.action === 'jump_to_step') {
-              setStep(action.step);
-              executedActions = true;
-            } else if (action.action === 'batch_teachers') {
-              const newTeachers = action.teacherNames.map((name: string) => ({ name }));
-              setTeachers(newTeachers);
-              executedActions = true;
-            } else if (action.action === 'update_total_labs') {
-              setTotalLabs(action.count);
-              executedActions = true;
+      const processAction = (jsonStr: string) => {
+        try {
+          const action = JSON.parse(jsonStr);
+          if (action.action === 'update_teacher') {
+            // Validate teacher exists
+            if (action.teacherName && !teachers.some(t => t.name === action.teacherName)) {
+              console.warn(`AI 尝试分配不存在的教师: ${action.teacherName}`);
+              return;
             }
-          } catch (e) {
-            // Not a valid action JSON, ignore
+            const newGroups = groups.map(g => {
+              if (g.courseName === action.courseName) {
+                const newAssignments = g.assignments.map(a => {
+                  if (a.labName === action.labName) return { ...a, teacherName: action.teacherName };
+                  return a;
+                });
+                return { ...g, assignments: newAssignments };
+              }
+              return g;
+            });
+            setGroups(newGroups);
+            executedActions = true;
+          } else if (action.action === 'set_course_teachers') {
+            // Validate teacher exists
+            if (action.teacherName && !teachers.some(t => t.name === action.teacherName)) {
+              console.warn(`AI 尝试分配不存在的教师: ${action.teacherName}`);
+              return;
+            }
+            const newGroups = groups.map(g => {
+              if (g.courseName === action.courseName) {
+                const newAssignments = g.assignments.map(a => ({ ...a, teacherName: action.teacherName }));
+                return { ...g, assignments: newAssignments };
+              }
+              return g;
+            });
+            setGroups(newGroups);
+            executedActions = true;
+          } else if (action.action === 'update_split') {
+            const newGroups = groups.map(g => {
+              if (g.courseName === action.courseName) {
+                return {
+                  ...g,
+                  splitConfig: {
+                    ...g.splitConfig,
+                    ...(action.numLabs !== undefined && { numLabs: action.numLabs }),
+                    ...(action.baseCapacity !== undefined && { baseCapacity: action.baseCapacity }),
+                  }
+                };
+              }
+              return g;
+            });
+            setGroups(newGroups);
+            executedActions = true;
+          } else if (action.action === 'jump_to_step') {
+            setStep(action.step);
+            executedActions = true;
+          } else if (action.action === 'batch_teachers') {
+            const newTeachers = action.teacherNames.map((name: string) => ({ name }));
+            setTeachers([...teachers, ...newTeachers]);
+            executedActions = true;
+          } else if (action.action === 'update_total_labs') {
+            setTotalLabs(action.count);
+            executedActions = true;
           }
+        } catch (e) {
+          // Not a valid action JSON, ignore
+        }
+      };
+
+      if (codeBlockMatch) {
+        for (const block of codeBlockMatch) {
+          const jsonStr = block.replace(/```json\s*|\s*```/g, '').trim();
+          processAction(jsonStr);
+        }
+      } else if (jsonMatch) {
+        for (const jsonStr of jsonMatch) {
+          processAction(jsonStr);
         }
       }
 
