@@ -130,6 +130,7 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
     setIsLoading(true);
 
     try {
+      const WEEKDAYS = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
       const systemInstruction = `你是一个实验室排课系统的智能助手。
 当前系统状态：
 - 步骤: ${useStore.getState().step}
@@ -137,17 +138,14 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
 - 教师总数: ${teachers.length}
 - 实验室总数: ${totalLabs}
 - 合班组数: ${groups.length}
-- 课程列表: ${courses.join(', ')}
 - 当前排课详情:
-${groups.map(g => `  * 课程: ${g.courseName}, 班级: ${g.classNames.join('+')}, 实验室数: ${g.splitConfig.numLabs}, 教师: ${g.assignments.map(a => `${a.labName}(${a.teacherName || '未分配'})`).join(', ')}`).join('\n')}
+${groups.map(g => `  | 课程: [${g.courseName}] (ID: ${g.id}) | 时间: ${g.time.startWeek}-${g.time.endWeek}周 ${WEEKDAYS[g.time.weekday - 1]} ${g.time.session} ${g.time.period} | 班级: ${g.classNames.join('+')} | 实验室数: ${g.splitConfig.numLabs} | 教师: ${g.assignments.map(a => `${a.labName}(${a.teacherName || '未分配'})`).join(', ')}`).join('\n')}
 
 你可以通过返回特定格式的 JSON 来调用函数修改系统设置。
-如果用户上传了文件（Excel, PDF, Word, 图片），请分析文件内容并根据用户要求进行操作。
-
-你可以执行的操作（请在回复中包含 JSON 代码块）：
-1. { "action": "update_teacher", "courseName": "...", "labName": "...", "teacherName": "..." } - 更新特定实验室的教师
-2. { "action": "set_course_teachers", "courseName": "...", "teacherName": "..." } - 为该课程的所有实验室设置同一位教师
-3. { "action": "update_split", "courseName": "...", "numLabs": 2, "baseCapacity": 30 } - 更新课程的拆分设置
+如果用户上传了文件，请分析并操作。你可以执行的操作（必须包含在 \`\`\`json 代码块中）：
+1. { "action": "update_teacher", "groupId": "...", "labName": "...", "teacherName": "..." } - 更新特定实验室的教师（务必使用组ID精确匹配）
+2. { "action": "set_course_teachers", "groupId": "...", "teacherName": "..." } - 为该组的所有实验室设置同一位教师（务必使用组ID）
+3. { "action": "update_split", "groupId": "...", "numLabs": 2, "baseCapacity": 30 } - 更新课程的拆分设置
 4. { "action": "jump_to_step", "step": 1-6 } - 跳转到特定步骤
 5. { "action": "batch_teachers", "teacherNames": ["...", "..."] } - 批量添加教师名单
 6. { "action": "update_total_labs", "count": 12 } - 更新实验室总数
@@ -199,7 +197,7 @@ ${groups.map(g => `  * 课程: ${g.courseName}, 班级: ${g.classNames.join('+')
               return;
             }
             const newGroups = groups.map(g => {
-              if (g.courseName === action.courseName) {
+              if (g.id === action.groupId || g.courseName === action.courseName) {
                 const newAssignments = g.assignments.map(a => {
                   if (a.labName === action.labName) return { ...a, teacherName: action.teacherName };
                   return a;
@@ -217,7 +215,7 @@ ${groups.map(g => `  * 课程: ${g.courseName}, 班级: ${g.classNames.join('+')
               return;
             }
             const newGroups = groups.map(g => {
-              if (g.courseName === action.courseName) {
+              if (g.id === action.groupId || g.courseName === action.courseName) {
                 const newAssignments = g.assignments.map(a => ({ ...a, teacherName: action.teacherName }));
                 return { ...g, assignments: newAssignments };
               }
@@ -227,7 +225,7 @@ ${groups.map(g => `  * 课程: ${g.courseName}, 班级: ${g.classNames.join('+')
             executedActions = true;
           } else if (action.action === 'update_split') {
             const newGroups = groups.map(g => {
-              if (g.courseName === action.courseName) {
+              if (g.id === action.groupId || g.courseName === action.courseName) {
                 return {
                   ...g,
                   splitConfig: {
