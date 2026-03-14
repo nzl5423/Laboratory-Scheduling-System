@@ -2,9 +2,6 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { CombinedClassGroup, WEEKDAYS, Student } from './types';
 
-/**
- * Standard cell styling: thin borders, middle/center alignment, wrap text.
- */
 const applyDefaultStyle = (cell: ExcelJS.Cell) => {
   cell.border = {
     top: { style: 'thin' },
@@ -19,9 +16,6 @@ const applyDefaultStyle = (cell: ExcelJS.Cell) => {
   };
 };
 
-/**
- * Sort students by className first, then by id.
- */
 const sortStudents = (students: Student[]) => {
   return [...students].sort((a, b) => {
     const classCmp = (a.className || '').localeCompare(b.className || '');
@@ -30,16 +24,13 @@ const sortStudents = (students: Student[]) => {
   });
 };
 
-/**
- * Excel sheet name sanitizer.
- * - remove illegal chars
- * - keep max 31 chars
- * - avoid empty name
- */
 const sanitizeSheetName = (name: string, suffix: string) => {
   const illegalChars = /[\\\/\?\*$$$$\:]/g;
   let cleanName = (name || '未命名课程').replace(illegalChars, '').trim();
-  if (!cleanName) cleanName = '未命名课程';
+
+  if (!cleanName) {
+    cleanName = '未命名课程';
+  }
 
   const maxLen = 31 - suffix.length;
   if (cleanName.length > maxLen) {
@@ -50,27 +41,45 @@ const sanitizeSheetName = (name: string, suffix: string) => {
 };
 
 const getWeekText = (group: CombinedClassGroup) => {
-  return `${group.time.startWeek}-${group.time.endWeek}周`;
+  const startWeek = group.time?.startWeek;
+  const endWeek = group.time?.endWeek;
+
+  if (startWeek && endWeek) {
+    return `${startWeek}-${endWeek}周`;
+  }
+
+  if (startWeek) {
+    return `${startWeek}周`;
+  }
+
+  return '未排周次';
 };
 
 const getTimeText = (group: CombinedClassGroup) => {
-  const weekday = WEEKDAYS[group.time.weekday - 1] || '未知星期';
-  return `${group.time.session} ${group.time.period} (${weekday})`;
+  const weekday = WEEKDAYS[group.time.weekday - 1] || `星期${group.time.weekday}`;
+  const section = group.time.sectionName || '';
+  return `${weekday} ${section}`.trim();
 };
 
 const getClassInfo = (group: CombinedClassGroup) => {
   const countsByClass: Record<string, number> = {};
+
   group.students.forEach((s) => {
-    countsByClass[s.className] = (countsByClass[s.className] || 0) + 1;
+    const className = s.className || '未知班级';
+    countsByClass[className] = (countsByClass[className] || 0) + 1;
   });
 
   const validClassNames = (group.classNames || []).filter(Boolean);
+
   if (validClassNames.length === 0) {
-    return `无班级信息 0人`;
+    return `无班级信息 = ${group.students.length}人`;
   }
 
   const classNamesText = validClassNames.join('、');
-  const countsText = validClassNames.map((name) => countsByClass[name] || 0).join('+');
+  const countsText = validClassNames
+    .map((name) => countsByClass[name] || 0)
+    .join('+');
+
   return `${classNamesText} = ${countsText}人`;
 };
 
@@ -94,7 +103,7 @@ export const exportFullWorkbook = async (
   const totalCols = 5 + totalLabs;
 
   // ==========================================================================
-  // Sheet 1: 教师教室表
+  // Sheet 1: 教师教室表 nzl
   // ==========================================================================
   const sheet1 = workbook.addWorksheet('教师教室表');
   sheet1.mergeCells(1, 1, 1, totalCols);
@@ -125,11 +134,12 @@ export const exportFullWorkbook = async (
   let mergeStartRow = 3;
 
   sortedGroups.forEach((group, index) => {
-    const weekday = WEEKDAYS[group.time.weekday - 1] || '未知星期';
+    const weekday = WEEKDAYS[group.time.weekday - 1] || `星期${group.time.weekday}`;
+
     const rowData: (string | number)[] = [
       getWeekText(group),
       weekday,
-      `${group.time.session} ${group.time.period}`,
+      group.time.sectionName || '',
       group.courseName || '未命名课程',
       getClassInfo(group),
     ];
@@ -199,7 +209,7 @@ export const exportFullWorkbook = async (
 
     const headerRow = sheet2.getRow(s2CurrentRow);
     headerRow.getCell(1).value = '室号';
-    headerRow.getCell(2).value = '号数 (学号范围)';
+    headerRow.getCell(2).value = '号数（学号范围）';
     headerRow.getCell(1).font = { bold: true };
     headerRow.getCell(2).font = { bold: true };
     applyDefaultStyle(headerRow.getCell(1));
@@ -217,8 +227,11 @@ export const exportFullWorkbook = async (
       const studentsByClass: Record<string, Student[]> = {};
 
       sortedInLab.forEach((s) => {
-        if (!studentsByClass[s.className]) studentsByClass[s.className] = [];
-        studentsByClass[s.className].push(s);
+        const className = s.className || '未知班级';
+        if (!studentsByClass[className]) {
+          studentsByClass[className] = [];
+        }
+        studentsByClass[className].push(s);
       });
 
       const rangeTexts = Object.entries(studentsByClass).map(([className, list]) => {
@@ -262,7 +275,7 @@ export const exportFullWorkbook = async (
       group.assignments.forEach((assign) => {
         gradeSheet.mergeCells(gRow, 1, gRow, 14);
         const h1 = gradeSheet.getCell(gRow, 1);
-        h1.value = `${courseName} - ${assign.labName || '实验室'} 成绩单`;
+        h1.value = `${courseName} - ${assign.labName || '未命名实验室'} 成绩单`;
         h1.font = { bold: true, size: 12 };
         applyDefaultStyle(h1);
         h1.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -343,7 +356,7 @@ export const exportFullWorkbook = async (
       group.assignments.forEach((assign) => {
         seatSheet.mergeCells(sRow, 1, sRow, 11);
         const h1 = seatSheet.getCell(sRow, 1);
-        h1.value = `${courseName} | ${assign.labName || '实验室'} | 教师：${assign.teacherName || ''} | 时间：${getWeekText(group)} ${getTimeText(group)}`;
+        h1.value = `${courseName} | ${assign.labName || '未命名实验室'} | 教师：${assign.teacherName || ''} | 时间：${getWeekText(group)} ${getTimeText(group)}`;
         h1.font = { bold: true };
         applyDefaultStyle(h1);
         h1.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -384,6 +397,7 @@ export const exportFullWorkbook = async (
 
         for (let r = 0; r < maxRows; r++) {
           const rowData = new Array(11).fill('');
+
           if (col1[r]) {
             rowData[0] = col1[r].id;
             rowData[1] = col1[r].name;
