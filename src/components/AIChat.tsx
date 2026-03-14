@@ -25,7 +25,7 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
     groups, setGroups,
     teachers, setTeachers,
     students, setStudents,
-    courses, setStep,
+    courses, setStep, step,
     totalLabs, setTotalLabs
   } = useStore();
 
@@ -133,16 +133,18 @@ export const AIChat = ({ onClose }: { onClose: () => void }) => {
       const WEEKDAYS = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
       const systemInstruction = `你是一个实验室排课系统的智能助手。
 当前系统状态：
-- 步骤: ${useStore.getState().step}
-- 学生总数: ${students.length}
-- 教师总数: ${teachers.length}
+- 步骤: ${step}
+- 学生总数: ${students.length}人 (包含班级: ${Array.from(new Set(students.map(s => s.className))).join(', ')})
+- 教师名单: ${teachers.length > 0 ? teachers.map(t => t.name).join(', ') : '暂无'}
 - 实验室总数: ${totalLabs}
 - 合班组数: ${groups.length}
+- 课程列表: ${courses.join(', ')}
 - 当前排课详情:
-${groups.map(g => `  | 课程: [${g.courseName}] (ID: ${g.id}) | 时间: ${g.time.startWeek}-${g.time.endWeek}周 ${WEEKDAYS[g.time.weekday - 1]} ${g.time.session} ${g.time.period} | 班级: ${g.classNames.join('+')} | 实验室数: ${g.splitConfig.numLabs} | 教师: ${g.assignments.map(a => `${a.labName}(${a.teacherName || '未分配'})`).join(', ')}`).join('\n')}
+${groups.length > 0 ? groups.map(g => `[ID: ${g.id}] 课程: ${g.courseName} | 时间: ${g.time.startWeek}-${g.time.endWeek}周 ${WEEKDAYS[g.time.weekday-1]} ${g.time.session} ${g.time.period} | 班级: ${g.classNames.join(', ')} | 实验室数: ${g.splitConfig.numLabs} | 教师: (${g.assignments.map(a => `${a.labName}: ${a.teacherName || '未分配'}`).join(', ')})`).join('\n') : '暂无排课数据'}
 
 你可以通过返回特定格式的 JSON 来调用函数修改系统设置。
-如果用户上传了文件，请分析并操作。你可以执行的操作（必须包含在 \`\`\`json 代码块中）：
+如果用户上传了文件（Excel, PDF, Word, 图片），请分析文件内容并根据用户要求进行操作。
+你可以执行的操作（请在回复中包含 JSON 代码块）：
 1. { "action": "update_teacher", "groupId": "...", "labName": "...", "teacherName": "..." } - 更新特定实验室的教师（务必使用组ID精确匹配）
 2. { "action": "set_course_teachers", "groupId": "...", "teacherName": "..." } - 为该组的所有实验室设置同一位教师（务必使用组ID）
 3. { "action": "update_split", "groupId": "...", "numLabs": 2, "baseCapacity": 30 } - 更新课程的拆分设置
