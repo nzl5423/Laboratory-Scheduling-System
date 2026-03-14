@@ -55,7 +55,7 @@ const getWeekText = (group: CombinedClassGroup) => {
 
 const getTimeText = (group: CombinedClassGroup) => {
   const weekday = WEEKDAYS[group.time.weekday - 1] || '未知星期';
-  return `${getWeekText(group)} ${weekday} ${group.time.session}${group.time.period}`;
+  return `${group.time.session} ${group.time.period} (${weekday})`;
 };
 
 const getClassInfo = (group: CombinedClassGroup) => {
@@ -69,9 +69,9 @@ const getClassInfo = (group: CombinedClassGroup) => {
     return `无班级信息 0人`;
   }
 
-  const classNamesText = validClassNames.join(',');
+  const classNamesText = validClassNames.join('、');
   const countsText = validClassNames.map((name) => countsByClass[name] || 0).join('+');
-  return `${classNamesText} ${countsText}=${group.totalStudents}人`;
+  return `${classNamesText} = ${countsText}人`;
 };
 
 const buildLabNameList = (group: CombinedClassGroup, totalLabs: number) => {
@@ -118,7 +118,7 @@ export const exportFullWorkbook = async (
   const sortedGroups = [...groups].sort((a, b) => {
     if (a.time.weekday !== b.time.weekday) return a.time.weekday - b.time.weekday;
     if (a.time.startWeek !== b.time.startWeek) return a.time.startWeek - b.time.startWeek;
-    return a.courseName.localeCompare(b.courseName);
+    return (a.courseName || '').localeCompare(b.courseName || '');
   });
 
   let lastWeekday = '';
@@ -129,18 +129,18 @@ export const exportFullWorkbook = async (
     const rowData: (string | number)[] = [
       getWeekText(group),
       weekday,
-      `${group.time.session}${group.time.period}`,
+      `${group.time.session} ${group.time.period}`,
       group.courseName || '未命名课程',
       getClassInfo(group),
     ];
 
     const groupLabNames = buildLabNameList(group, totalLabs);
 
-    for (let i = 1; i <= totalLabs; i++) {
-      const expectedName = `实验室${i}`;
+    for (let i = 0; i < totalLabs; i++) {
+      const expectedName = groupLabNames[i] || `实验室${i + 1}`;
       const assignment =
         group.assignments.find((a) => a.labName === expectedName) ||
-        group.assignments[i - 1];
+        group.assignments[i];
 
       rowData.push(assignment?.teacherName || '');
     }
@@ -192,7 +192,7 @@ export const exportFullWorkbook = async (
 
     sheet2.mergeCells(s2CurrentRow, 1, s2CurrentRow, 2);
     const bHeader2 = sheet2.getCell(s2CurrentRow, 1);
-    bHeader2.value = `上课时间：${getTimeText(group)}`;
+    bHeader2.value = `上课时间：${getWeekText(group)} ${getTimeText(group)}`;
     applyDefaultStyle(bHeader2);
     bHeader2.alignment = { horizontal: 'left', vertical: 'middle' };
     s2CurrentRow++;
@@ -262,7 +262,7 @@ export const exportFullWorkbook = async (
       group.assignments.forEach((assign) => {
         gradeSheet.mergeCells(gRow, 1, gRow, 14);
         const h1 = gradeSheet.getCell(gRow, 1);
-        h1.value = `${courseName} - ${assign.labName || '未命名实验室'} 成绩单`;
+        h1.value = `${courseName} - ${assign.labName || '实验室'} 成绩单`;
         h1.font = { bold: true, size: 12 };
         applyDefaultStyle(h1);
         h1.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -317,7 +317,7 @@ export const exportFullWorkbook = async (
 
         gradeSheet.mergeCells(gRow, 1, gRow, 14);
         const footer = gradeSheet.getCell(gRow, 1);
-        footer.value = `上课时间：${getTimeText(group)}     带教教师：${assign.teacherName || '未分配'}`;
+        footer.value = `上课时间：${getWeekText(group)} ${getTimeText(group)}    带教教师：${assign.teacherName || ''}`;
         applyDefaultStyle(footer);
         footer.alignment = { horizontal: 'left', vertical: 'middle' };
         gRow += 4;
@@ -343,9 +343,10 @@ export const exportFullWorkbook = async (
       group.assignments.forEach((assign) => {
         seatSheet.mergeCells(sRow, 1, sRow, 11);
         const h1 = seatSheet.getCell(sRow, 1);
-        h1.value = `${courseName} | ${assign.labName || '未命名实验室'} | 教师：${assign.teacherName || '未分配'} | 时间：${getTimeText(group)}`;
+        h1.value = `${courseName} | ${assign.labName || '实验室'} | 教师：${assign.teacherName || ''} | 时间：${getWeekText(group)} ${getTimeText(group)}`;
         h1.font = { bold: true };
         applyDefaultStyle(h1);
+        h1.alignment = { horizontal: 'left', vertical: 'middle' };
         sRow++;
 
         seatSheet.mergeCells(sRow, 1, sRow, 11);
@@ -383,10 +384,22 @@ export const exportFullWorkbook = async (
 
         for (let r = 0; r < maxRows; r++) {
           const rowData = new Array(11).fill('');
-          if (col1[r]) { rowData[0] = col1[r].id; rowData[1] = col1[r].name; }
-          if (col2[r]) { rowData[3] = col2[r].id; rowData[4] = col2[r].name; }
-          if (col3[r]) { rowData[6] = col3[r].id; rowData[7] = col3[r].name; }
-          if (col4[r]) { rowData[9] = col4[r].id; rowData[10] = col4[r].name; }
+          if (col1[r]) {
+            rowData[0] = col1[r].id;
+            rowData[1] = col1[r].name;
+          }
+          if (col2[r]) {
+            rowData[3] = col2[r].id;
+            rowData[4] = col2[r].name;
+          }
+          if (col3[r]) {
+            rowData[6] = col3[r].id;
+            rowData[7] = col3[r].name;
+          }
+          if (col4[r]) {
+            rowData[9] = col4[r].id;
+            rowData[10] = col4[r].name;
+          }
 
           const row = seatSheet.addRow(rowData);
           row.eachCell((cell, colNumber) => {
@@ -421,4 +434,3 @@ export const exportFullWorkbook = async (
   const buffer = await workbook.xlsx.writeBuffer();
   saveAs(new Blob([buffer]), `实验室排课方案_${dateStr}.xlsx`);
 };
-", "source": "OneRouterTavily"}]}
