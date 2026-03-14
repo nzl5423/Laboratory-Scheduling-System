@@ -204,10 +204,12 @@ export default function App() {
     if (targetStep === 5) {
       const conflicts = checkStudentConflicts();
       if (conflicts.length > 0) {
-        if (!window.confirm(`发现学生上课时间冲突，是否忽略并强制继续？\n${conflicts[0]}`)) return;
+        const conflictDetail = conflicts[0];
+        if (!window.confirm(`检测到学生上课时间冲突，是否忽略并强制继续？\n\n详细信息：\n${conflictDetail}`)) return;
       }
       if (labConflicts.length > 0) {
-        if (!window.confirm(`发现实验室资源冲突，是否忽略并强制继续？\n${labConflicts[0]}`)) return;
+        const labConflictDetail = labConflicts[0];
+        if (!window.confirm(`检测到实验室资源冲突，是否忽略并强制继续？\n\n详细信息：\n${labConflictDetail}`)) return;
       }
       proceedToStep5();
       return;
@@ -243,7 +245,8 @@ export default function App() {
             if (commonStudents.length > 0) {
               const studentNames = commonStudents.slice(0, 3).map(s => s.name).join('、');
               const suffix = commonStudents.length > 3 ? `等 ${commonStudents.length} 人` : '';
-              conflicts.push(`⚠️ 学生冲突：${studentNames}${suffix} 在 ${WEEKDAYS[g1.time.weekday-1]} ${g1.time.period} 同时被安排了 [${g1.courseName}] 和 [${g2.courseName}]`);
+              const timeInfo = `${g1.time.startWeek}-${g1.time.endWeek}周 ${WEEKDAYS[g1.time.weekday-1]} ${g1.time.session}${g1.time.period}`;
+              conflicts.push(`⚠️ 学生冲突：${studentNames}${suffix} 在 ${timeInfo} 同时被安排了 [${g1.courseName || '未命名课程'}] 和 [${g2.courseName || '未命名课程'}]`);
             }
           }
         }
@@ -273,8 +276,8 @@ export default function App() {
             
             const totalUsed = overlappingGroups.reduce((sum, g) => sum + g.splitConfig.numLabs, 0);
             if (totalUsed > totalLabs) {
-              const timeStr = `第${w}周 ${WEEKDAYS[d-1]} ${session}第${p}节`;
-              const courseNames = overlappingGroups.map(g => g.courseName).join('、');
+              const timeStr = `${w}周 ${WEEKDAYS[d-1]} ${session}${p}节`;
+              const courseNames = overlappingGroups.map(g => g.courseName || '未命名课程').join('、');
               const conflictMsg = `⚠️ 实验室超限：${timeStr} 实验室总需求为 ${totalUsed} (上限 ${totalLabs})。涉及课程：${courseNames}`;
               if (!conflicts.includes(conflictMsg)) {
                 conflicts.push(conflictMsg);
@@ -308,6 +311,7 @@ export default function App() {
       setStudents(parsed);
       const uniqueClasses = new Set(parsed.map(s => s.className)).size;
       setStudentSummary(`✅ 解析成功：共导入 ${parsed.length} 名学生，涉及 ${uniqueClasses} 个班级。`);
+      toast.success(`成功导入 ${parsed.length} 名学生，${uniqueClasses} 个班级`);
     };
     reader.readAsBinaryString(file);
   };
@@ -327,6 +331,7 @@ export default function App() {
       const parsed = data.slice(startIdx).flat().filter(Boolean).map(name => ({ name: String(name) }));
       setTeachers([...teachers, ...parsed]);
       setTeacherSummary(`✅ 解析成功：共导入 ${parsed.length} 名教师。`);
+      toast.success(`成功导入 ${parsed.length} 名教师`);
     };
     reader.readAsBinaryString(file);
   };
@@ -351,6 +356,7 @@ export default function App() {
       
       const uniqueCourses = new Set(newGroups.map(g => g.courseName)).size;
       setGroupSummary(`✅ 解析成功：共提取 ${uniqueCourses} 门课程，${newGroups.length} 个合班组。`);
+      toast.success(`成功导入 ${uniqueCourses} 门课程，${newGroups.length} 个合班组`);
       
       const allGroupClasses = Array.from(new Set(newGroups.flatMap(g => g.classNames)));
       const unassigned = allGroupClasses.filter(cn => !students.some(s => s.className === cn));
@@ -453,7 +459,8 @@ export default function App() {
       return;
     }
     if (studentConflicts.length > 0) {
-      if (!window.confirm(`发现学生上课时间冲突，是否忽略并强制继续？\n${studentConflicts[0]}`)) return;
+      const conflictDetail = studentConflicts[0];
+      if (!window.confirm(`检测到学生上课时间冲突，是否忽略并强制继续？\n\n详细信息：\n${conflictDetail}`)) return;
     }
     
     setGroups(groups.map(g => {
@@ -596,7 +603,11 @@ export default function App() {
       };
     });
     setGroups(updatedGroups);
-    toast.success(`已删除班级: ${className}`);
+    if (className) {
+      toast.success(`已删除班级: ${className}`);
+    } else {
+      toast.success('班级已删除');
+    }
   };
 
   // --- Render Steps ---
@@ -1163,22 +1174,22 @@ export default function App() {
                     {[...groups].sort((a, b) => a.time.weekday - b.time.weekday).map(group => (
                       <tr key={group.id} className="hover:bg-black/[0.02] transition-colors">
                         <td className="p-4 whitespace-nowrap font-medium border-r border-black/5">
-                          {group.time.startWeek}-{group.time.endWeek}周
+                          {group.time.startWeek || 1}-{group.time.endWeek || 16}周
                         </td>
                         <td className="p-4 whitespace-nowrap border-r border-black/5">
-                          <div className="font-medium">{WEEKDAYS[group.time.weekday-1]}</div>
+                          <div className="font-medium">{WEEKDAYS[group.time.weekday-1] || '未知'}</div>
                         </td>
                         <td className="p-4 whitespace-nowrap border-r border-black/5">
-                          <div className="text-xs text-black/40">{group.time.session} {group.time.period}</div>
+                          <div className="text-xs text-black/40">{group.time.session || ''} {group.time.period || ''}</div>
                         </td>
-                        <td className="p-4 font-medium border-r border-black/5">{group.courseName}</td>
+                        <td className="p-4 font-medium border-r border-black/5">{group.courseName || '未命名课程'}</td>
                         <td className="p-4 border-r border-black/5">
                           <div className="text-xs font-medium">
-                            {group.classNames.join(',')} {(() => {
+                            {group.classNames.length > 0 ? group.classNames.join(',') : '无班级'} {(() => {
                               const counts: Record<string, number> = {};
                               group.students.forEach(s => counts[s.className] = (counts[s.className] || 0) + 1);
-                              return group.classNames.map(name => counts[name] || 0).join('+');
-                            })()}={group.totalStudents}人
+                              return group.classNames.length > 0 ? group.classNames.map(name => counts[name] || 0).join('+') : '0';
+                            })()}={group.totalStudents || 0}人
                           </div>
                         </td>
                         {Array.from({ length: totalLabs }).map((_, i) => {
@@ -1230,11 +1241,11 @@ export default function App() {
                 {previewMode === 'attendance' && activeGroup && activeAssign && (
                   <Card className="p-8 text-left max-w-5xl mx-auto overflow-x-auto">
                     <div className="border-b border-black/5 pb-6 mb-6">
-                      <h4 className="text-2xl font-bold mb-2">{activeGroup.courseName} - {activeAssign.labName} 成绩单</h4>
+                      <h4 className="text-2xl font-bold mb-2">{activeGroup.courseName || '未命名课程'} - {activeAssign.labName || '未命名实验室'} 成绩单</h4>
                       <div className="flex gap-6 text-sm text-black/40">
-                        <span>带教教师: <span className="text-black font-medium">{activeAssign.teacherName}</span></span>
-                        <span>时间: <span className="text-black font-medium">{WEEKDAYS[activeGroup.time.weekday-1]} {activeGroup.time.session} {activeGroup.time.period}</span></span>
-                        <span>学生人数: <span className="text-black font-medium">{activeAssign.studentRange.count} 人</span></span>
+                        <span>带教教师: <span className="text-black font-medium">{activeAssign.teacherName || '未分配'}</span></span>
+                        <span>时间: <span className="text-black font-medium">{WEEKDAYS[activeGroup.time.weekday-1] || '未知'} {activeGroup.time.session || ''} {activeGroup.time.period || ''}</span></span>
+                        <span>学生人数: <span className="text-black font-medium">{activeAssign.studentRange.count || 0} 人</span></span>
                       </div>
                     </div>
                     <div className="border border-black/5 rounded-xl shadow-inner bg-white">
@@ -1280,7 +1291,7 @@ export default function App() {
                   <div className="max-w-5xl mx-auto">
                     <Card className="p-12">
                       <div className="text-center mb-8">
-                        <h4 className="text-lg font-bold mb-4">{activeGroup.classNames.join(',')} {activeAssign.labName} 座位安排</h4>
+                        <h4 className="text-lg font-bold mb-4">{activeGroup.classNames.length > 0 ? activeGroup.classNames.join(',') : '未选择班级'} {activeAssign.labName || '未命名实验室'} 座位安排</h4>
                         <div className="w-full py-4 bg-black/5 rounded-2xl border border-black/10 font-bold text-xl tracking-[1em] mb-8">讲台</div>
                       </div>
                       
@@ -1321,15 +1332,15 @@ export default function App() {
                       <div className="mt-12 pt-8 border-t border-black/5 flex justify-between items-center text-black/40">
                         <div className="text-left">
                           <p className="text-xs font-bold uppercase tracking-widest mb-1">课程信息</p>
-                          <p className="text-sm font-medium text-black">{activeGroup.courseName}</p>
+                          <p className="text-sm font-medium text-black">{activeGroup.courseName || '未命名课程'}</p>
                         </div>
                         <div className="text-center">
                           <p className="text-xs font-bold uppercase tracking-widest mb-1">实验室</p>
-                          <p className="text-sm font-medium text-black">{activeAssign.labName}</p>
+                          <p className="text-sm font-medium text-black">{activeAssign.labName || '未命名实验室'}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs font-bold uppercase tracking-widest mb-1">带教教师</p>
-                          <p className="text-sm font-medium text-black">{activeAssign.teacherName}</p>
+                          <p className="text-sm font-medium text-black">{activeAssign.teacherName || '未分配'}</p>
                         </div>
                       </div>
                     </Card>
@@ -1708,7 +1719,7 @@ const TeachingGroupCard = ({ group, allClassNames, studentsPool, coursePool, onU
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-black/5 rounded-xl text-sm font-medium">
               <Users size={16} />
-              共 {group.totalStudents} 人
+              共 {group.totalStudents || 0} 人
             </div>
           </div>
 
@@ -1878,12 +1889,12 @@ const TeacherAssignCard = ({ group, teachers, totalLabs, onUpdate, checkConflict
             <Users size={20} />
           </div>
           <div>
-            <h3 className="text-xl font-bold">课程名称：{group.courseName}</h3>
-            <h4 className="text-sm font-medium text-black/60 mt-1">上课班级：<span className="text-xs">{group.classNames.map((cn: string) => {
+            <h3 className="text-xl font-bold">课程名称：{group.courseName || '未命名课程'}</h3>
+            <h4 className="text-sm font-medium text-black/60 mt-1">上课班级：<span className="text-xs">{group.classNames.length > 0 ? group.classNames.map((cn: string) => {
               const count = group.students.filter((s: any) => s.className === cn).length;
               return `${cn}(${count}人)`;
-            }).join(', ')}</span></h4>
-            <p className="text-black/40 text-[10px] font-medium mt-1">共 {group.totalStudents} 人 · {WEEKDAYS[group.time.weekday-1]} {group.time.session}{group.time.period}</p>
+            }).join(', ') : '未选择班级'}</span></h4>
+            <p className="text-black/40 text-[10px] font-medium mt-1">共 {group.totalStudents || 0} 人 · {WEEKDAYS[group.time.weekday-1] || '未知星期'} {group.time.session || ''}{group.time.period || ''}</p>
           </div>
         </div>
       </div>
